@@ -53,12 +53,9 @@ function viewTabs(): vscode.Tab[] {
 
 class ViewDocs implements vscode.TextDocumentContentProvider {
   private readonly texts = new Map<string, string>();
-  private readonly changed = new vscode.EventEmitter<vscode.Uri>();
-  readonly onDidChange = this.changed.event;
 
   set(uri: vscode.Uri, text: string): void {
     this.texts.set(uri.toString(), text);
-    this.changed.fire(uri);
   }
 
   drop(uri: vscode.Uri): void {
@@ -67,10 +64,6 @@ class ViewDocs implements vscode.TextDocumentContentProvider {
 
   clear(): void {
     this.texts.clear();
-  }
-
-  dispose(): void {
-    this.changed.dispose();
   }
 
   async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
@@ -249,7 +242,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   controller = roam;
 
   context.subscriptions.push(
-    docs,
     output,
     status,
     { dispose: () => typeCapture?.dispose() },
@@ -265,6 +257,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (
         event.contentChanges.length > 0 &&
+        event.document.uri.scheme !== SCHEME &&
         event.document === vscode.window.activeTextEditor?.document
       ) {
         roam.noteActivity('editor');

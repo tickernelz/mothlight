@@ -71,24 +71,21 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       const original = await openReal('src/alpha.ts');
       const before = original.getText();
+      const onDisk = async (): Promise<string> =>
+        new TextDecoder().decode(await vscode.workspace.fs.readFile(original.uri));
       await vscode.commands.executeCommand('mothlight.startNow');
       await waitFor(() => viewTabs().length === 1 && activeUri()?.scheme === SCHEME, 'a roam tab');
       const copy = vscode.workspace.textDocuments.find((document) => document.uri.scheme === SCHEME);
       assert.ok(copy, 'the copy is open as a document');
-      const edit = new vscode.WorkspaceEdit();
-      edit.insert(copy.uri, new vscode.Position(0, 0), 'x');
-      let applied = false;
-      try {
-        applied = await vscode.workspace.applyEdit(edit);
-      } catch {
-        applied = false;
-      }
-      assert.equal(applied, false, 'the copy rejects edits');
+      assert.notEqual(copy.uri.toString(), original.uri.toString());
+      assert.equal(copy.uri.path, original.uri.path);
+      assert.equal(await onDisk(), before, 'the file on disk is untouched while browsing');
       await vscode.commands.executeCommand('mothlight.stop');
       await waitFor(() => viewTabs().length === 0, 'roam tabs to close');
       await waitFor(() => activeUri()?.toString() === original.uri.toString(), 'the original editor');
       assert.equal(original.isDirty, false);
       assert.equal(original.getText(), before);
+      assert.equal(await onDisk(), before);
     },
   ],
   [
