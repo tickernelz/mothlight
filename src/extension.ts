@@ -151,8 +151,8 @@ class VscodeHost implements RoamHost {
 
   geometry(view: RoamView): Geometry | undefined {
     const editor = this.editors.get(view.id);
-    const open = viewTabs().some((tab) => tabUri(tab)?.toString() === view.id);
-    if (!editor || !open) return undefined;
+    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
+    if (!editor || !active || tabUri(active)?.toString() !== view.id) return undefined;
     const first = editor.visibleRanges[0];
     const last = editor.visibleRanges[editor.visibleRanges.length - 1];
     return {
@@ -248,15 +248,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const roam = new RoamController(host);
   controller = roam;
 
-  const onTabsChanged = (): void => {
-    if (roam.state !== 'roaming') {
-      roam.noteActivity('other');
-      return;
-    }
-    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
-    if (active && tabUri(active)?.scheme !== SCHEME) roam.noteActivity('editor');
-  };
-
   context.subscriptions.push(
     docs,
     output,
@@ -285,7 +276,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.onDidChangeWindowState((state) => {
       if (state.focused) roam.noteActivity('other');
     }),
-    vscode.window.tabGroups.onDidChangeTabs(onTabsChanged),
+    vscode.window.tabGroups.onDidChangeTabs(() => {
+      if (roam.state !== 'roaming') roam.noteActivity('other');
+    }),
     vscode.window.onDidChangeActiveTerminal(() => roam.noteActivity('other')),
     vscode.window.onDidOpenTerminal(() => roam.noteActivity('other')),
     vscode.window.onDidCloseTerminal(() => roam.noteActivity('other')),

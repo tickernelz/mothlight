@@ -272,6 +272,16 @@ test('a roam tab closed by the user ends roaming', async () => {
   assert.deepEqual(host.closeAlls, [false]);
 });
 
+test('a missing view is tolerated during the grace period and ends roaming after it', async () => {
+  const { clock, host, controller } = setup();
+  await clock.advance(60_000);
+  host.gone = true;
+  await clock.advance(200);
+  assert.equal(controller.state, 'roaming');
+  await clock.advance(400);
+  assert.equal(controller.state, 'watching');
+});
+
 test('dispose closes the roam tabs and cancels timers', async () => {
   const { clock, host, controller } = setup();
   await clock.advance(61_000);

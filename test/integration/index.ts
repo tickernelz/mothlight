@@ -3,10 +3,17 @@ import * as vscode from 'vscode';
 
 const SCHEME = 'mothlight';
 
+function snapshot(): string {
+  const tabs = vscode.window.tabGroups.all.flatMap((group) =>
+    group.tabs.map((tab) => (tabUri(tab)?.toString() ?? tab.label) + (tab.isActive ? ' (active)' : '')),
+  );
+  return '[' + tabs.join(', ') + ']';
+}
+
 async function waitFor(check: () => boolean, label: string, timeoutMs = 15000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!check()) {
-    if (Date.now() > deadline) throw new Error('timed out waiting for ' + label);
+    if (Date.now() > deadline) throw new Error('timed out waiting for ' + label + ' with tabs ' + snapshot());
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }

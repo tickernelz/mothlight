@@ -296,12 +296,16 @@ export class RoamController {
     const view = this.focus;
     if (!view) return;
     const geometry = this.host.geometry(view);
+    const now = this.clock.now();
     if (!geometry) {
-      this.noteActivity('other');
+      if (now < this.graceUntil) {
+        this.cancelTick = this.clock.after(TICK_MS, () => this.tick(session));
+      } else {
+        this.noteActivity('other');
+      }
       return;
     }
     const settings = this.host.settings();
-    const now = this.clock.now();
     const tolerance = Math.max(2, Math.ceil(settings.scrollLinesPerSecond * 0.4));
     if (now >= this.graceUntil && Math.abs(geometry.top - this.commanded) > tolerance) {
       this.noteActivity('editor');

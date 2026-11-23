@@ -58,7 +58,7 @@ Any activity signal ends roaming. Mothlight then closes every roam tab, and VS C
 - keyboard, mouse, selection and scroll activity in an editor return focus to the editor
 - window, terminal and tab activity leave focus where it is
 
-Scrolling is detected by reading the top line back on every tick and comparing it with the line Mothlight asked for. A difference larger than two lines (or 40% of the scroll speed) means you scrolled.
+Scrolling is detected by reading the top line back on every tick and comparing it with the line Mothlight asked for. A difference larger than two lines (or 40% of the scroll speed) means you scrolled. The same tick notices when you switch to another tab or close the roam tab, within 100 ms. Tab events are deliberately not used while roaming, because they also fire for Mothlight's own tabs.
 
 ### Typing into a copy
 
