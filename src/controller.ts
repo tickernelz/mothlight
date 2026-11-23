@@ -47,6 +47,7 @@ const MOVE_TICK_MAX_MS = 250;
 const PAUSE_TICK_MS = 1000;
 const POOL_TTL_MS = 10 * 60 * 1000;
 const GRACE_MS = 400;
+const PAUSE_GRACE_MS = 1500;
 const SWITCH_PROBABILITY = 0.3;
 const MAX_OPEN_ATTEMPTS = 5;
 const RECENT_LIMIT = 8;
@@ -78,6 +79,7 @@ export class RoamController {
   private moveUntil = 0;
   private pauseUntil = 0;
   private pausing = false;
+  private reason = '';
   private graceUntil = 0;
 
   constructor(host: RoamHost, clock: Clock = systemClock) {
@@ -87,6 +89,10 @@ export class RoamController {
 
   get state(): RoamState {
     return this.current;
+  }
+
+  get lastEnd(): string {
+    return this.reason;
   }
 
   start(): void {
@@ -112,10 +118,12 @@ export class RoamController {
     this.scheduleWatch();
   }
 
-  noteActivity(source: ActivitySource): void {
+  noteActivity(source: ActivitySource, reason: string = source): void {
     if (this.disposed) return;
     this.lastActivity = this.clock.now();
-    if (this.current === 'roaming') void this.finish(source === 'editor');
+    if (this.current !== 'roaming') return;
+    this.reason = reason;
+    void this.finish(source === 'editor', 'ended by ' + reason);
   }
 
   async startNow(): Promise<void> {
@@ -339,7 +347,7 @@ export class RoamController {
   private beginPause(now: number): void {
     const settings = this.host.settings();
     this.pausing = true;
-    this.graceUntil = now + GRACE_MS;
+    this.graceUntil = now + PAUSE_GRACE_MS;
     this.pauseUntil = now + this.between(settings.pauseMinSeconds, settings.pauseMaxSeconds) * 1000;
   }
 
@@ -363,16 +371,18 @@ export class RoamController {
       if (now < this.graceUntil) {
         this.cancelTick = this.clock.after(this.tickMs(), () => this.tick(session));
       } else {
-        this.noteActivity('other');
+        this.noteActivity('other', 'view-gone');
       }
       return;
     }
     const settings = this.host.settings();
     const tolerance = Math.max(2, Math.ceil(settings.scrollLinesPerSecond * 0.4));
-    const moved = this.observedTop !== undefined && geometry.top !== this.observedTop;
+    const previous = this.observedTop;
+    const moved = previous !== undefined && geometry.top !== previous;
     this.observedTop = geometry.top;
     if (moved && now >= this.graceUntil && (this.pausing || !this.isOwnScroll(geometry.top, tolerance))) {
-      this.noteActivity('editor');
+      const phase = this.pausing ? 'paused-scroll' : 'scroll';
+      this.noteActivity('editor', phase + ' top=' + geometry.top + ' was=' + previous + ' issued=' + this.issued.join(','));
       return;
     }
     if (this.pausing) {

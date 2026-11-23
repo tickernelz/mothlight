@@ -246,9 +246,13 @@ function describe(state: RoamState, detail: string | undefined, settings: RoamSe
     : base[state];
 }
 
+export interface MothlightApi {
+  lastEnd(): string;
+}
+
 let controller: RoamController | undefined;
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export async function activate(context: vscode.ExtensionContext): Promise<MothlightApi> {
   const docs = new ViewDocs();
   const output = vscode.window.createOutputChannel('Mothlight');
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 0);
@@ -263,7 +267,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     status.show();
     if (state === 'roaming') {
       typeCapture ??= captureTyping(async () => {
-        roam.noteActivity('editor');
+        roam.noteActivity('editor', 'typing');
         await roam.settled();
       });
     } else {
@@ -288,7 +292,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         event.kind === vscode.TextEditorSelectionChangeKind.Mouse
       ) {
         lastArea = 'editor';
-        roam.noteActivity('editor');
+        roam.noteActivity('editor', 'selection');
       }
     }),
     vscode.workspace.onDidChangeTextDocument((event) => {
@@ -297,17 +301,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         event.document.uri.scheme !== SCHEME &&
         event.document === vscode.window.activeTextEditor?.document
       ) {
-        roam.noteActivity('editor');
+        roam.noteActivity('editor', 'edit');
       }
     }),
     vscode.window.onDidChangeTextEditorVisibleRanges(() => {
-      if (roam.state !== 'roaming') roam.noteActivity('other');
+      if (roam.state !== 'roaming') roam.noteActivity('other', 'visible-ranges');
     }),
     vscode.window.onDidChangeWindowState((state) => {
-      if (state.focused) roam.noteActivity('other');
+      if (state.focused) roam.noteActivity('other', 'window-focus');
     }),
     vscode.window.tabGroups.onDidChangeTabs(() => {
-      if (roam.state !== 'roaming') roam.noteActivity('other');
+      if (roam.state !== 'roaming') roam.noteActivity('other', 'tabs');
     }),
     vscode.window.onDidChangeActiveTerminal(() => {
       lastArea = 'terminal';
@@ -340,6 +344,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   await host.closeAll(false);
   roam.start();
+  return { lastEnd: () => roam.lastEnd };
 }
 
 export function deactivate(): Promise<void> | undefined {

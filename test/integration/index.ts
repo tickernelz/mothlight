@@ -6,6 +6,8 @@ import * as vscode from 'vscode';
 
 const SCHEME = 'mothlight';
 
+let endNote = (): string => 'unavailable';
+
 async function screenshot(name: string): Promise<void> {
   const dir = process.env['MOTHLIGHT_SHOTS'];
   if (!dir) return;
@@ -135,7 +137,7 @@ const tests: [string, () => Promise<void>][] = [
             assert.equal(snapshot(), resting, 'tabs changed during the pause');
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
-          assert.equal(viewTabs().length, 1);
+          assert.equal(viewTabs().length, 1, 'roaming ended: ' + endNote());
         },
       );
     },
@@ -154,7 +156,7 @@ const tests: [string, () => Promise<void>][] = [
           );
           await new Promise((resolve) => setTimeout(resolve, 2500));
           await screenshot('follow-on');
-          assert.equal(activeUri()?.scheme, SCHEME, 'the roam tab is still active');
+          assert.equal(activeUri()?.scheme, SCHEME, 'the roam tab is still active, roaming ended: ' + endNote());
           assert.equal(viewTabs().length, 1);
         },
       );
@@ -256,7 +258,8 @@ const tests: [string, () => Promise<void>][] = [
 export async function run(): Promise<void> {
   const extension = vscode.extensions.getExtension('tickernelz.mothlight');
   assert.ok(extension, 'the extension is installed in the test host');
-  await extension.activate();
+  const api = (await extension.activate()) as { lastEnd(): string };
+  endNote = () => api.lastEnd();
   const failures: string[] = [];
   for (const [name, test] of tests) {
     try {

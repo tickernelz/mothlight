@@ -515,3 +515,18 @@ test('a scroll away from the target after the animation still ends roaming', asy
   await clock.advance(300);
   assert.equal(controller.state, 'watching');
 });
+
+test('late position readings right after a movement do not end roaming', async () => {
+  const { clock, host, controller } = setup(slow);
+  clock.value = 0.25;
+  await clock.advance(60_000);
+  await clock.advance(6_000);
+  const key = host.opened[0] ?? '';
+  host.tops.set(key, (host.tops.get(key) ?? 0) + 1);
+  await clock.advance(1_200);
+  assert.equal(controller.state, 'roaming');
+  await clock.advance(3_000);
+  host.tops.set(key, (host.tops.get(key) ?? 0) + 1);
+  await clock.advance(1_200);
+  assert.equal(controller.state, 'watching');
+});
