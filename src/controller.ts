@@ -1,3 +1,4 @@
+import { planScroll } from './scroll.ts';
 import type { RoamSettings } from './settings.ts';
 
 export type RoamState = 'off' | 'watching' | 'roaming';
@@ -69,6 +70,7 @@ export class RoamController {
   private views: RoamView[] = [];
   private focus: RoamView | undefined;
   private position = 0;
+  private direction: 1 | -1 = 1;
   private commanded = 0;
   private issued: number[] = [];
   private observedTop: number | undefined;
@@ -309,10 +311,17 @@ export class RoamController {
       if (session !== this.session) return;
     }
     const now = this.clock.now();
+    const geometry = this.host.geometry(view);
+    const plan = planScroll(
+      geometry ? geometry.lineCount - geometry.visibleLines : 0,
+      this.clock.random(),
+      this.clock.random(),
+    );
     this.issued = [];
     this.observedTop = undefined;
-    this.scroll(view, 0);
-    this.position = 0;
+    this.direction = plan.direction;
+    this.scroll(view, plan.start);
+    this.position = plan.start;
     this.lastTick = now;
     this.pausing = false;
     this.graceUntil = now + GRACE_MS;
@@ -382,10 +391,12 @@ export class RoamController {
     const maxTop = Math.max(0, geometry.lineCount - geometry.visibleLines);
     const step = Math.min(now - this.lastTick, MAX_TICK_STEP_MS);
     this.lastTick = now;
-    this.position += (settings.scrollLinesPerSecond * step) / 1000;
-    const target = Math.floor(this.position);
-    if (target >= maxTop) {
-      if (this.commanded !== maxTop) this.scroll(view, maxTop);
+    this.position += (this.direction * settings.scrollLinesPerSecond * step) / 1000;
+    const goingDown = this.direction === 1;
+    const target = goingDown ? Math.floor(this.position) : Math.ceil(this.position);
+    if (goingDown ? target >= maxTop : target <= 0) {
+      const edge = goingDown ? maxTop : 0;
+      if (this.commanded !== edge) this.scroll(view, edge);
       this.beginPause(now);
     } else if (target !== this.commanded) {
       this.scroll(view, target);

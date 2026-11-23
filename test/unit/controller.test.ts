@@ -209,11 +209,12 @@ test('scrolls at the configured rate', async () => {
     moveMinSeconds: 120,
     moveMaxSeconds: 120,
   });
+  clock.value = 0.25;
   await clock.advance(60_000);
   const key = host.opened[0] ?? '';
   await clock.advance(5_000);
   const top = host.tops.get(key) ?? -1;
-  assert.ok(top >= 45 && top <= 51, 'top was ' + top);
+  assert.ok(top >= 138 && top <= 141, 'top was ' + top);
   assert.equal(controller.state, 'roaming');
 });
 
@@ -265,6 +266,7 @@ test('sometimes switches back to an open roam tab', async () => {
 test('pauses early when the end of a short file is reached', async () => {
   const { clock, host } = setup(quick);
   host.lineCount = 60;
+  clock.value = 0.25;
   await clock.advance(60_000);
   await clock.advance(6_000);
   assert.ok(host.scrolls.includes(20));
@@ -453,4 +455,26 @@ test('leaves the explorer alone when following is off', async () => {
   assert.equal(controller.state, 'roaming');
   assert.ok(host.opened.length >= 2);
   assert.equal(host.revealed.length, 0);
+});
+
+test('starts each movement at a different place in the file', async () => {
+  const { clock, host } = setup(quick);
+  clock.value = 0;
+  await clock.advance(60_000);
+  clock.value = 0.5;
+  await clock.advance(11_000);
+  clock.value = 0.99;
+  await clock.advance(14_000);
+  assert.ok(host.scrolls.includes(0), 'top ' + host.scrolls.slice(0, 3).join(','));
+  assert.ok(host.scrolls.includes(180), 'middle');
+  assert.ok(host.scrolls.includes(357), 'bottom');
+});
+
+test('scrolls up when the direction draw says so', async () => {
+  const { clock, host } = setup({ moveMinSeconds: 120, moveMaxSeconds: 120 });
+  await clock.advance(60_000);
+  const key = host.opened[0] ?? '';
+  await clock.advance(5_000);
+  const top = host.tops.get(key) ?? -1;
+  assert.ok(top >= 148 && top <= 152, 'top was ' + top);
 });
