@@ -19,8 +19,10 @@ function readSettings(): RoamSettings {
   return normalizeSettings({
     enabled: config.get('enabled'),
     idleSeconds: config.get('idleSeconds'),
-    hopMinSeconds: config.get('hopMinSeconds'),
-    hopMaxSeconds: config.get('hopMaxSeconds'),
+    moveMinSeconds: config.get('moveMinSeconds'),
+    moveMaxSeconds: config.get('moveMaxSeconds'),
+    pauseMinSeconds: config.get('pauseMinSeconds'),
+    pauseMaxSeconds: config.get('pauseMaxSeconds'),
     scrollLinesPerSecond: config.get('scrollLinesPerSecond'),
     maxRoamTabs: config.get('maxRoamTabs'),
     maxFileSizeKb: config.get('maxFileSizeKb'),
@@ -81,6 +83,7 @@ class VscodeHost implements RoamHost {
   private readonly docs: ViewDocs;
   private readonly onState: (state: RoamState, detail?: string) => void;
   private readonly editors = new Map<string, vscode.TextEditor>();
+  private search: vscode.CancellationTokenSource | undefined;
 
   constructor(docs: ViewDocs, onState: (state: RoamState, detail?: string) => void) {
     this.docs = docs;
@@ -94,8 +97,18 @@ class VscodeHost implements RoamHost {
   async candidates(): Promise<readonly string[]> {
     const { exclude } = readSettings();
     const pattern = exclude.length > 0 ? '{' + exclude.join(',') + '}' : undefined;
-    const uris = await vscode.workspace.findFiles('**/*', pattern, MAX_INDEXED_FILES);
-    return uris.filter((uri) => isRoamablePath(uri.path)).map((uri) => uri.toString());
+    this.search?.cancel();
+    const source = new vscode.CancellationTokenSource();
+    this.search = source;
+    try {
+      const uris = await vscode.workspace.findFiles('**/*', pattern, MAX_INDEXED_FILES, source.token);
+      return source.token.isCancellationRequested
+        ? []
+        : uris.filter((uri) => isRoamablePath(uri.path)).map((uri) => uri.toString());
+    } finally {
+      if (this.search === source) this.search = undefined;
+      source.dispose();
+    }
   }
 
   async open(key: string): Promise<RoamView | undefined> {
@@ -172,6 +185,7 @@ class VscodeHost implements RoamHost {
   }
 
   async closeAll(focusEditor: boolean): Promise<void> {
+    this.search?.cancel();
     const tabs = viewTabs();
     this.editors.clear();
     if (tabs.length > 0) await vscode.window.tabGroups.close(tabs, !focusEditor);
@@ -278,8 +292,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.onDidStartTerminalShellExecution(() => roam.noteActivity('other')),
     vscode.window.onDidEndTerminalShellExecution(() => roam.noteActivity('other')),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration(SECTION)) roam.refresh();
+      if (event.affectsConfiguration(SECTION)) {
+        roam.invalidate();
+        roam.refresh();
+      }
     }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => roam.invalidate()),
     vscode.commands.registerCommand('mothlight.toggle', async () => {
       const config = vscode.workspace.getConfiguration(SECTION);
       await config.update('enabled', !config.get('enabled', true), vscode.ConfigurationTarget.Global);

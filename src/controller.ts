@@ -41,7 +41,9 @@ export const systemClock: Clock = {
 };
 
 const TICK_MS = 100;
-const END_PAUSE_MS = 2000;
+const MOVE_TICK_MAX_MS = 250;
+const PAUSE_TICK_MS = 1000;
+const POOL_TTL_MS = 10 * 60 * 1000;
 const GRACE_MS = 400;
 const SWITCH_PROBABILITY = 0.3;
 const MAX_OPEN_ATTEMPTS = 5;
@@ -60,6 +62,7 @@ export class RoamController {
   private stopping: Promise<void> | undefined;
   private disposed = false;
   private pool: readonly string[] = [];
+  private poolAt: number | undefined;
   private recent: string[] = [];
   private rejected = new Set<string>();
   private views: RoamView[] = [];
@@ -69,9 +72,10 @@ export class RoamController {
   private issued: number[] = [];
   private observedTop: number | undefined;
   private lastTick = 0;
-  private hopAt = 0;
+  private moveUntil = 0;
+  private pauseUntil = 0;
+  private pausing = false;
   private graceUntil = 0;
-  private endedAt: number | undefined;
 
   constructor(host: RoamHost, clock: Clock = systemClock) {
     this.host = host;
@@ -132,6 +136,18 @@ export class RoamController {
     if (this.current === 'roaming') await this.finish(false);
   }
 
+  invalidate(): void {
+    this.poolAt = undefined;
+  }
+
+  private poolStale(): boolean {
+    return (
+      this.pool.length === 0 ||
+      this.poolAt === undefined ||
+      this.clock.now() - this.poolAt > POOL_TTL_MS
+    );
+  }
+
   private setState(state: RoamState, detail?: string): void {
     this.current = state;
     this.host.stateChanged(state, detail);
@@ -169,8 +185,12 @@ export class RoamController {
     this.rejected.clear();
     this.setState('roaming');
     try {
-      this.pool = await this.host.candidates();
-      if (session !== this.session) return;
+      if (this.poolStale()) {
+        const found = await this.host.candidates();
+        if (session !== this.session) return;
+        this.pool = found;
+        this.poolAt = this.clock.now();
+      }
       if (this.pool.length === 0) {
         await this.finish(false, 'no-files');
         return;
@@ -289,9 +309,9 @@ export class RoamController {
     this.scroll(view, 0);
     this.position = 0;
     this.lastTick = now;
-    this.endedAt = undefined;
+    this.pausing = false;
     this.graceUntil = now + GRACE_MS;
-    this.hopAt = now + this.between(settings.hopMinSeconds, settings.hopMaxSeconds) * 1000;
+    this.moveUntil = now + this.between(settings.moveMinSeconds, settings.moveMaxSeconds) * 1000;
     this.cancelTick = this.clock.after(TICK_MS, () => this.tick(session));
   }
 
@@ -302,8 +322,21 @@ export class RoamController {
     if (this.issued.length > ISSUED_WINDOW) this.issued.shift();
   }
 
+  private beginPause(now: number): void {
+    const settings = this.host.settings();
+    this.pausing = true;
+    this.graceUntil = now + GRACE_MS;
+    this.pauseUntil = now + this.between(settings.pauseMinSeconds, settings.pauseMaxSeconds) * 1000;
+  }
+
   private isOwnScroll(top: number, tolerance: number): boolean {
     return top >= Math.min(...this.issued) - tolerance && top <= Math.max(...this.issued) + tolerance;
+  }
+
+  private tickMs(): number {
+    if (this.pausing) return this.clock.now() < this.graceUntil ? TICK_MS : PAUSE_TICK_MS;
+    const speed = this.host.settings().scrollLinesPerSecond;
+    return Math.max(TICK_MS, Math.min(MOVE_TICK_MAX_MS, Math.round(1000 / speed)));
   }
 
   private tick(session: number): void {
@@ -314,7 +347,7 @@ export class RoamController {
     const now = this.clock.now();
     if (!geometry) {
       if (now < this.graceUntil) {
-        this.cancelTick = this.clock.after(TICK_MS, () => this.tick(session));
+        this.cancelTick = this.clock.after(this.tickMs(), () => this.tick(session));
       } else {
         this.noteActivity('other');
       }
@@ -324,12 +357,21 @@ export class RoamController {
     const tolerance = Math.max(2, Math.ceil(settings.scrollLinesPerSecond * 0.4));
     const moved = this.observedTop !== undefined && geometry.top !== this.observedTop;
     this.observedTop = geometry.top;
-    if (moved && now >= this.graceUntil && !this.isOwnScroll(geometry.top, tolerance)) {
+    if (moved && now >= this.graceUntil && (this.pausing || !this.isOwnScroll(geometry.top, tolerance))) {
       this.noteActivity('editor');
       return;
     }
-    if (now >= this.hopAt) {
-      this.hop(session).catch((error: unknown) => this.fail(session, error));
+    if (this.pausing) {
+      if (now >= this.pauseUntil) {
+        this.hop(session).catch((error: unknown) => this.fail(session, error));
+      } else {
+        this.cancelTick = this.clock.after(this.tickMs(), () => this.tick(session));
+      }
+      return;
+    }
+    if (now >= this.moveUntil) {
+      this.beginPause(now);
+      this.cancelTick = this.clock.after(this.tickMs(), () => this.tick(session));
       return;
     }
     const maxTop = Math.max(0, geometry.lineCount - geometry.visibleLines);
@@ -339,14 +381,10 @@ export class RoamController {
     const target = Math.floor(this.position);
     if (target >= maxTop) {
       if (this.commanded !== maxTop) this.scroll(view, maxTop);
-      this.endedAt ??= now;
-      if (now - this.endedAt >= END_PAUSE_MS) {
-        this.hop(session).catch((error: unknown) => this.fail(session, error));
-        return;
-      }
+      this.beginPause(now);
     } else if (target !== this.commanded) {
       this.scroll(view, target);
     }
-    this.cancelTick = this.clock.after(TICK_MS, () => this.tick(session));
+    this.cancelTick = this.clock.after(this.tickMs(), () => this.tick(session));
   }
 }

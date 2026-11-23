@@ -15,6 +15,7 @@ const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve
 class FakeClock implements Clock {
   time = 0;
   value = 0.5;
+  scheduled = 0;
   private timers: { at: number; id: number; run: () => void }[] = [];
   private seq = 0;
 
@@ -28,6 +29,7 @@ class FakeClock implements Clock {
 
   after(ms: number, run: () => void): () => void {
     const timer = { at: this.time + ms, id: this.seq++, run };
+    this.scheduled += 1;
     this.timers.push(timer);
     return () => {
       this.timers = this.timers.filter((candidate) => candidate !== timer);
@@ -58,6 +60,7 @@ class FakeHost implements RoamHost {
   visibleLines = 40;
   gone = false;
   frozen = false;
+  fetches = 0;
   tops = new Map<string, number>();
   live = new Set<string>();
   opened: string[] = [];
@@ -71,6 +74,7 @@ class FakeHost implements RoamHost {
   }
 
   candidates(): Promise<readonly string[]> {
+    this.fetches += 1;
     return Promise.resolve(this.pool);
   }
 
@@ -120,6 +124,20 @@ class FakeHost implements RoamHost {
     this.states.push({ state, detail });
   }
 }
+
+const quick: RawSettings = {
+  moveMinSeconds: 5,
+  moveMaxSeconds: 5,
+  pauseMinSeconds: 5,
+  pauseMaxSeconds: 5,
+};
+
+const slow: RawSettings = {
+  moveMinSeconds: 5,
+  moveMaxSeconds: 5,
+  pauseMinSeconds: 30,
+  pauseMaxSeconds: 30,
+};
 
 function setup(config: RawSettings = {}) {
   const clock = new FakeClock();
@@ -182,8 +200,8 @@ test('activity outside the editor leaves focus where it is', async () => {
 test('scrolls at the configured rate', async () => {
   const { clock, host, controller } = setup({
     scrollLinesPerSecond: 10,
-    hopMinSeconds: 600,
-    hopMaxSeconds: 600,
+    moveMinSeconds: 120,
+    moveMaxSeconds: 120,
   });
   await clock.advance(60_000);
   const key = host.opened[0] ?? '';
@@ -194,7 +212,7 @@ test('scrolls at the configured rate', async () => {
 });
 
 test('a manual scroll ends roaming', async () => {
-  const { clock, host, controller } = setup({ hopMinSeconds: 600, hopMaxSeconds: 600 });
+  const { clock, host, controller } = setup({ moveMinSeconds: 120, moveMaxSeconds: 120 });
   await clock.advance(63_000);
   const key = host.opened[0] ?? '';
   host.tops.set(key, (host.tops.get(key) ?? 0) + 25);
@@ -204,46 +222,48 @@ test('a manual scroll ends roaming', async () => {
 });
 
 test('keeps roaming when the editor never reports scrolling', async () => {
-  const { clock, host, controller } = setup({ hopMinSeconds: 10, hopMaxSeconds: 10 });
+  const { clock, host, controller } = setup({ ...quick, moveMinSeconds: 10, moveMaxSeconds: 10 });
   host.frozen = true;
   await clock.advance(60_000);
-  await clock.advance(25_000);
+  await clock.advance(40_000);
   assert.equal(controller.state, 'roaming');
   assert.ok(host.opened.length >= 3, 'opened ' + host.opened.length);
 });
 
-test('moves to another file after the hop time', async () => {
-  const { clock, host } = setup({ hopMinSeconds: 10, hopMaxSeconds: 10 });
+test('moves to another file after each pause', async () => {
+  const { clock, host } = setup({ ...quick, moveMinSeconds: 10, moveMaxSeconds: 10 });
   await clock.advance(60_000);
-  await clock.advance(11_000);
+  await clock.advance(17_000);
   assert.equal(host.opened.length, 2);
   assert.notEqual(host.opened[0], host.opened[1]);
 });
 
 test('keeps at most the configured number of roam tabs', async () => {
-  const { clock, host } = setup({ hopMinSeconds: 5, hopMaxSeconds: 5, maxRoamTabs: 2 });
+  const { clock, host } = setup({ ...quick, maxRoamTabs: 2 });
   host.pool = ['a', 'b', 'c', 'd', 'e', 'f'];
   clock.value = 0.99;
   await clock.advance(60_000);
-  await clock.advance(40_000);
+  await clock.advance(45_000);
   assert.ok(host.opened.length >= 4, 'opened ' + host.opened.length);
   assert.ok(host.live.size <= 2, 'live ' + host.live.size);
 });
 
 test('sometimes switches back to an open roam tab', async () => {
-  const { clock, host } = setup({ hopMinSeconds: 5, hopMaxSeconds: 5 });
+  const { clock, host } = setup(quick);
   clock.value = 0.1;
   await clock.advance(60_000);
-  await clock.advance(40_000);
+  await clock.advance(45_000);
   assert.ok(host.shown.length > 0);
 });
 
-test('moves on after reaching the end of a short file', async () => {
-  const { clock, host } = setup();
+test('pauses early when the end of a short file is reached', async () => {
+  const { clock, host } = setup(quick);
   host.lineCount = 60;
   await clock.advance(60_000);
-  await clock.advance(8_000);
+  await clock.advance(6_000);
   assert.ok(host.scrolls.includes(20));
+  assert.equal(host.opened.length, 1);
+  await clock.advance(6_000);
   assert.equal(host.opened.length, 2);
 });
 
@@ -320,7 +340,7 @@ test('turning the setting off ends roaming', async () => {
 });
 
 test('never repeats the previous file back to back', async () => {
-  const { clock, host } = setup({ hopMinSeconds: 5, hopMaxSeconds: 5 });
+  const { clock, host } = setup(quick);
   host.pool = ['a', 'b'];
   clock.value = 0.99;
   await clock.advance(60_000);
@@ -329,4 +349,75 @@ test('never repeats the previous file back to back', async () => {
   for (let index = 1; index < host.opened.length; index += 1) {
     assert.notEqual(host.opened[index], host.opened[index - 1]);
   }
+});
+
+test('stands still between movements', async () => {
+  const { clock, host, controller } = setup(slow);
+  await clock.advance(60_000);
+  await clock.advance(5_500);
+  const settled = host.scrolls.length;
+  assert.ok(settled > 5, 'scrolls ' + settled);
+  await clock.advance(25_000);
+  assert.equal(host.scrolls.length, settled);
+  assert.equal(host.opened.length, 1);
+  assert.equal(controller.state, 'roaming');
+  await clock.advance(6_000);
+  assert.equal(host.opened.length, 2);
+  assert.ok(host.scrolls.length > settled);
+});
+
+test('polls about once a second while paused', async () => {
+  const { clock } = setup(slow);
+  await clock.advance(60_000);
+  await clock.advance(7_000);
+  const before = clock.scheduled;
+  await clock.advance(20_000);
+  const polls = clock.scheduled - before;
+  assert.ok(polls >= 15 && polls <= 22, 'polls ' + polls);
+});
+
+test('input during a pause hands control back', async () => {
+  const { clock, host, controller } = setup(slow);
+  await clock.advance(70_000);
+  controller.noteActivity('editor');
+  await controller.settled();
+  assert.equal(controller.state, 'watching');
+  assert.deepEqual(host.closeAlls, [true]);
+  assert.equal(host.live.size, 0);
+});
+
+test('a small scroll during a pause ends roaming', async () => {
+  const { clock, host, controller } = setup(slow);
+  await clock.advance(70_000);
+  const key = host.opened[0] ?? '';
+  host.tops.set(key, (host.tops.get(key) ?? 0) + 1);
+  await clock.advance(1_500);
+  assert.equal(controller.state, 'watching');
+  assert.deepEqual(host.closeAlls, [true]);
+});
+
+test('reuses the file list for later sessions', async () => {
+  const { host, controller } = setup();
+  await controller.startNow();
+  await controller.stop();
+  await controller.startNow();
+  assert.equal(host.fetches, 1);
+});
+
+test('invalidate forces a fresh file list', async () => {
+  const { host, controller } = setup();
+  await controller.startNow();
+  await controller.stop();
+  controller.invalidate();
+  await controller.startNow();
+  assert.equal(host.fetches, 2);
+});
+
+test('refreshes the file list after ten minutes', async () => {
+  const { clock, host, controller } = setup({ idleSeconds: 3600 });
+  await controller.startNow();
+  await controller.stop();
+  await clock.advance(3_601_000);
+  assert.equal(controller.state, 'roaming');
+  assert.equal(host.fetches, 2);
 });

@@ -71,19 +71,33 @@
           "maximum": 3600,
           "description": "Seconds without editor activity before roaming starts."
         },
-        "mothlight.hopMinSeconds": {
+        "mothlight.moveMinSeconds": {
           "type": "number",
-          "default": 8,
+          "default": 5,
           "minimum": 2,
-          "maximum": 600,
-          "description": "Shortest time spent on one file before moving to the next."
+          "maximum": 120,
+          "description": "Shortest time spent moving before standing still."
         },
-        "mothlight.hopMaxSeconds": {
+        "mothlight.moveMaxSeconds": {
           "type": "number",
-          "default": 25,
+          "default": 12,
           "minimum": 2,
-          "maximum": 600,
-          "description": "Longest time spent on one file before moving to the next."
+          "maximum": 120,
+          "description": "Longest time spent moving before standing still."
+        },
+        "mothlight.pauseMinSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "Shortest time to stand still between movements."
+        },
+        "mothlight.pauseMaxSeconds": {
+          "type": "number",
+          "default": 90,
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "Longest time to stand still between movements."
         },
         "mothlight.scrollLinesPerSecond": {
           "type": "number",
@@ -94,14 +108,14 @@
         },
         "mothlight.maxRoamTabs": {
           "type": "integer",
-          "default": 4,
+          "default": 3,
           "minimum": 1,
           "maximum": 10,
           "description": "Most roaming tabs kept open at once. Older ones are closed."
         },
         "mothlight.maxFileSizeKb": {
           "type": "integer",
-          "default": 512,
+          "default": 256,
           "minimum": 1,
           "maximum": 20480,
           "description": "Files larger than this are never opened."
