@@ -61,6 +61,8 @@ class FakeHost implements RoamHost {
   gone = false;
   frozen = false;
   fetches = 0;
+  smooth = false;
+  targets = new Map<string, number>();
   tops = new Map<string, number>();
   live = new Set<string>();
   opened: string[] = [];
@@ -99,6 +101,12 @@ class FakeHost implements RoamHost {
 
   geometry(view: RoamView): Geometry | undefined {
     if (this.gone) return undefined;
+    const target = this.targets.get(view.id);
+    const current = this.tops.get(view.id) ?? 0;
+    if (this.smooth && target !== undefined && target !== current) {
+      const step = Math.ceil(Math.abs(target - current) / 3);
+      this.tops.set(view.id, current + Math.sign(target - current) * step);
+    }
     return {
       top: this.frozen ? 0 : (this.tops.get(view.id) ?? 0),
       lineCount: this.lineCount,
@@ -107,8 +115,12 @@ class FakeHost implements RoamHost {
   }
 
   scrollTo(view: RoamView, line: number): void {
-    this.tops.set(view.id, line);
     this.scrolls.push(line);
+    if (this.smooth) {
+      this.targets.set(view.id, line);
+      return;
+    }
+    this.tops.set(view.id, line);
   }
 
   close(views: readonly RoamView[]): Promise<void> {
@@ -477,4 +489,29 @@ test('scrolls up when the direction draw says so', async () => {
   await clock.advance(5_000);
   const top = host.tops.get(key) ?? -1;
   assert.ok(top >= 148 && top <= 152, 'top was ' + top);
+});
+
+test('keeps roaming while the editor animates a long jump', async () => {
+  const { clock, host, controller } = setup();
+  host.smooth = true;
+  clock.value = 0.25;
+  await clock.advance(60_000);
+  await clock.advance(3_000);
+  assert.equal(controller.state, 'roaming');
+  assert.deepEqual(host.closeAlls, []);
+  const key = host.opened[0] ?? '';
+  assert.ok((host.tops.get(key) ?? 0) >= 85, 'top ' + String(host.tops.get(key)));
+});
+
+test('a scroll away from the target after the animation still ends roaming', async () => {
+  const { clock, host, controller } = setup({ moveMinSeconds: 120, moveMaxSeconds: 120 });
+  host.smooth = true;
+  clock.value = 0.25;
+  await clock.advance(60_000);
+  await clock.advance(3_000);
+  const key = host.opened[0] ?? '';
+  host.targets.delete(key);
+  host.tops.set(key, 300);
+  await clock.advance(300);
+  assert.equal(controller.state, 'watching');
 });

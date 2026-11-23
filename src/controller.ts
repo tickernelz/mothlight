@@ -317,7 +317,7 @@ export class RoamController {
       this.clock.random(),
       this.clock.random(),
     );
-    this.issued = [];
+    this.issued = geometry ? [geometry.top] : [];
     this.observedTop = undefined;
     this.direction = plan.direction;
     this.scroll(view, plan.start);
