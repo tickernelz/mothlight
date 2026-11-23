@@ -57,6 +57,7 @@ class FakeHost implements RoamHost {
   lineCount = 400;
   visibleLines = 40;
   gone = false;
+  frozen = false;
   tops = new Map<string, number>();
   live = new Set<string>();
   opened: string[] = [];
@@ -89,7 +90,7 @@ class FakeHost implements RoamHost {
   geometry(view: RoamView): Geometry | undefined {
     if (this.gone) return undefined;
     return {
-      top: this.tops.get(view.id) ?? 0,
+      top: this.frozen ? 0 : (this.tops.get(view.id) ?? 0),
       lineCount: this.lineCount,
       visibleLines: this.visibleLines,
     };
@@ -200,6 +201,15 @@ test('a manual scroll ends roaming', async () => {
   await clock.advance(300);
   assert.equal(controller.state, 'watching');
   assert.deepEqual(host.closeAlls, [true]);
+});
+
+test('keeps roaming when the editor never reports scrolling', async () => {
+  const { clock, host, controller } = setup({ hopMinSeconds: 10, hopMaxSeconds: 10 });
+  host.frozen = true;
+  await clock.advance(60_000);
+  await clock.advance(25_000);
+  assert.equal(controller.state, 'roaming');
+  assert.ok(host.opened.length >= 3, 'opened ' + host.opened.length);
 });
 
 test('moves to another file after the hop time', async () => {

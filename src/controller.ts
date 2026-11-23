@@ -47,6 +47,7 @@ const SWITCH_PROBABILITY = 0.3;
 const MAX_OPEN_ATTEMPTS = 5;
 const RECENT_LIMIT = 8;
 const MAX_TICK_STEP_MS = 500;
+const ISSUED_WINDOW = 8;
 
 export class RoamController {
   private readonly host: RoamHost;
@@ -65,6 +66,8 @@ export class RoamController {
   private focus: RoamView | undefined;
   private position = 0;
   private commanded = 0;
+  private issued: number[] = [];
+  private observedTop: number | undefined;
   private lastTick = 0;
   private hopAt = 0;
   private graceUntil = 0;
@@ -281,14 +284,26 @@ export class RoamController {
       if (session !== this.session) return;
     }
     const now = this.clock.now();
-    this.host.scrollTo(view, 0);
+    this.issued = [];
+    this.observedTop = undefined;
+    this.scroll(view, 0);
     this.position = 0;
-    this.commanded = 0;
     this.lastTick = now;
     this.endedAt = undefined;
     this.graceUntil = now + GRACE_MS;
     this.hopAt = now + this.between(settings.hopMinSeconds, settings.hopMaxSeconds) * 1000;
     this.cancelTick = this.clock.after(TICK_MS, () => this.tick(session));
+  }
+
+  private scroll(view: RoamView, line: number): void {
+    this.host.scrollTo(view, line);
+    this.commanded = line;
+    this.issued.push(line);
+    if (this.issued.length > ISSUED_WINDOW) this.issued.shift();
+  }
+
+  private isOwnScroll(top: number, tolerance: number): boolean {
+    return top >= Math.min(...this.issued) - tolerance && top <= Math.max(...this.issued) + tolerance;
   }
 
   private tick(session: number): void {
@@ -307,7 +322,9 @@ export class RoamController {
     }
     const settings = this.host.settings();
     const tolerance = Math.max(2, Math.ceil(settings.scrollLinesPerSecond * 0.4));
-    if (now >= this.graceUntil && Math.abs(geometry.top - this.commanded) > tolerance) {
+    const moved = this.observedTop !== undefined && geometry.top !== this.observedTop;
+    this.observedTop = geometry.top;
+    if (moved && now >= this.graceUntil && !this.isOwnScroll(geometry.top, tolerance)) {
       this.noteActivity('editor');
       return;
     }
@@ -321,18 +338,14 @@ export class RoamController {
     this.position += (settings.scrollLinesPerSecond * step) / 1000;
     const target = Math.floor(this.position);
     if (target >= maxTop) {
-      if (this.commanded !== maxTop) {
-        this.host.scrollTo(view, maxTop);
-        this.commanded = maxTop;
-      }
+      if (this.commanded !== maxTop) this.scroll(view, maxTop);
       this.endedAt ??= now;
       if (now - this.endedAt >= END_PAUSE_MS) {
         this.hop(session).catch((error: unknown) => this.fail(session, error));
         return;
       }
     } else if (target !== this.commanded) {
-      this.host.scrollTo(view, target);
-      this.commanded = target;
+      this.scroll(view, target);
     }
     this.cancelTick = this.clock.after(TICK_MS, () => this.tick(session));
   }
