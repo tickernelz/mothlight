@@ -76,7 +76,7 @@ Any activity signal ends roaming. Mothlight then closes every roam tab, and VS C
 - keyboard, mouse, selection and scroll activity in an editor return focus to the editor
 - window, terminal and tab activity leave focus where it is
 
-Scrolling is detected by reading the top line back on every tick. While moving, a change to a line that is not near one of the last eight lines Mothlight scrolled to (two lines, or 40% of the scroll speed, of tolerance) means you scrolled. While standing still, any change in the top line means you scrolled, after a short settling time. An editor that does not report scrolling, for example because its window is hidden, never counts as activity. The same tick notices when you switch to another tab or close the roam tab, within 100 ms. Tab events are deliberately not used while roaming, because they also fire for Mothlight's own tabs.
+Scrolling is detected by reading the top line back on every tick. While moving, a change to a line that is not near one of the last eight lines Mothlight scrolled to (three lines, or one and a half seconds of scrolling, of tolerance) means you scrolled. The tolerance is that wide because VS Code reports the top line several lines ahead of the line Mothlight asked for while scrolling up. While standing still, any change in the top line means you scrolled, after a short settling time. An editor that does not report scrolling, for example because its window is hidden, never counts as activity. The same tick notices when you switch to another tab or close the roam tab, within 100 ms. Tab events are deliberately not used while roaming, because they also fire for Mothlight's own tabs.
 
 ### Typing into a copy
 

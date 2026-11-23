@@ -48,6 +48,7 @@ const PAUSE_TICK_MS = 1000;
 const POOL_TTL_MS = 10 * 60 * 1000;
 const GRACE_MS = 400;
 const PAUSE_GRACE_MS = 1500;
+const BAND_SECONDS = 1.5;
 const SWITCH_PROBABILITY = 0.3;
 const MAX_OPEN_ATTEMPTS = 5;
 const RECENT_LIMIT = 8;
@@ -376,7 +377,7 @@ export class RoamController {
       return;
     }
     const settings = this.host.settings();
-    const tolerance = Math.max(2, Math.ceil(settings.scrollLinesPerSecond * 0.4));
+    const tolerance = Math.max(3, Math.ceil(settings.scrollLinesPerSecond * BAND_SECONDS));
     const previous = this.observedTop;
     const moved = previous !== undefined && geometry.top !== previous;
     this.observedTop = geometry.top;

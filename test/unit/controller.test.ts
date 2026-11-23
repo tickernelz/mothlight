@@ -62,6 +62,7 @@ class FakeHost implements RoamHost {
   frozen = false;
   fetches = 0;
   smooth = false;
+  lead = 0;
   targets = new Map<string, number>();
   tops = new Map<string, number>();
   live = new Set<string>();
@@ -108,7 +109,7 @@ class FakeHost implements RoamHost {
       this.tops.set(view.id, current + Math.sign(target - current) * step);
     }
     return {
-      top: this.frozen ? 0 : (this.tops.get(view.id) ?? 0),
+      top: this.frozen ? 0 : Math.max(0, (this.tops.get(view.id) ?? 0) - this.lead),
       lineCount: this.lineCount,
       visibleLines: this.visibleLines,
     };
@@ -529,4 +530,15 @@ test('late position readings right after a movement do not end roaming', async (
   host.tops.set(key, (host.tops.get(key) ?? 0) + 1);
   await clock.advance(1_200);
   assert.equal(controller.state, 'watching');
+});
+
+test('keeps roaming when the editor runs ahead of the lines it was asked for', async () => {
+  const { clock, host, controller } = setup();
+  host.lead = 5;
+  clock.value = 0.75;
+  await clock.advance(60_000);
+  await clock.advance(4_000);
+  assert.equal(controller.state, 'roaming');
+  assert.deepEqual(host.closeAlls, []);
+  assert.ok(host.scrolls.length > 6, 'scrolls ' + host.scrolls.length);
 });
