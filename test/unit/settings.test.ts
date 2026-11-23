@@ -5,6 +5,7 @@ import { DEFAULT_EXCLUDE, normalizeSettings } from '../../src/settings.ts';
 test('empty input yields the documented defaults', () => {
   assert.deepEqual(normalizeSettings({}), {
     enabled: true,
+    followExplorer: true,
     idleSeconds: 60,
     moveMinSeconds: 5,
     moveMaxSeconds: 12,
@@ -61,4 +62,10 @@ test('only non empty string patterns survive in exclude', () => {
 test('enabled is only false when explicitly false', () => {
   assert.equal(normalizeSettings({ enabled: false }).enabled, false);
   assert.equal(normalizeSettings({ enabled: 'no' }).enabled, true);
+});
+
+test('followExplorer is only false when explicitly false', () => {
+  assert.equal(normalizeSettings({ followExplorer: false }).followExplorer, false);
+  assert.equal(normalizeSettings({ followExplorer: 'no' }).followExplorer, true);
+  assert.equal(normalizeSettings({}).followExplorer, true);
 });

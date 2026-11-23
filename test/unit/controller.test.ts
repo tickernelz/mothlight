@@ -65,6 +65,7 @@ class FakeHost implements RoamHost {
   live = new Set<string>();
   opened: string[] = [];
   shown: string[] = [];
+  revealed: string[] = [];
   closeAlls: boolean[] = [];
   scrolls: number[] = [];
   states: { state: RoamState; detail: string | undefined }[] = [];
@@ -84,6 +85,11 @@ class FakeHost implements RoamHost {
     this.tops.set(key, 0);
     this.live.add(key);
     return Promise.resolve({ id: key });
+  }
+
+  reveal(view: RoamView): Promise<void> {
+    this.revealed.push(view.id);
+    return Promise.resolve();
   }
 
   show(view: RoamView): Promise<boolean> {
@@ -420,4 +426,31 @@ test('refreshes the file list after ten minutes', async () => {
   await clock.advance(3_601_000);
   assert.equal(controller.state, 'roaming');
   assert.equal(host.fetches, 2);
+});
+
+test('reveals each file in the explorer when it comes into view', async () => {
+  const { clock, host } = setup(quick);
+  clock.value = 0.99;
+  await clock.advance(60_000);
+  await clock.advance(25_000);
+  assert.ok(host.revealed.length >= 2, 'revealed ' + host.revealed.length);
+  assert.deepEqual(host.revealed, host.opened.slice(0, host.revealed.length));
+});
+
+test('reveals a roam tab it switches back to', async () => {
+  const { clock, host } = setup(quick);
+  clock.value = 0.1;
+  await clock.advance(60_000);
+  await clock.advance(45_000);
+  assert.ok(host.shown.length > 0);
+  for (const id of host.shown) assert.ok(host.revealed.includes(id), id);
+});
+
+test('leaves the explorer alone when following is off', async () => {
+  const { clock, host, controller } = setup({ ...quick, followExplorer: false });
+  await clock.advance(60_000);
+  await clock.advance(25_000);
+  assert.equal(controller.state, 'roaming');
+  assert.ok(host.opened.length >= 2);
+  assert.equal(host.revealed.length, 0);
 });

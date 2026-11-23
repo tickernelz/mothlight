@@ -18,6 +18,7 @@ function readSettings(): RoamSettings {
   const config = vscode.workspace.getConfiguration(SECTION);
   return normalizeSettings({
     enabled: config.get('enabled'),
+    followExplorer: config.get('followExplorer'),
     idleSeconds: config.get('idleSeconds'),
     moveMinSeconds: config.get('moveMinSeconds'),
     moveMaxSeconds: config.get('moveMaxSeconds'),
@@ -85,9 +86,16 @@ class VscodeHost implements RoamHost {
   private readonly editors = new Map<string, vscode.TextEditor>();
   private search: vscode.CancellationTokenSource | undefined;
 
-  constructor(docs: ViewDocs, onState: (state: RoamState, detail?: string) => void) {
+  private readonly followAllowed: () => boolean;
+
+  constructor(
+    docs: ViewDocs,
+    onState: (state: RoamState, detail?: string) => void,
+    followAllowed: () => boolean,
+  ) {
     this.docs = docs;
     this.onState = onState;
+    this.followAllowed = followAllowed;
   }
 
   settings(): RoamSettings {
@@ -152,6 +160,19 @@ class VscodeHost implements RoamHost {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async reveal(view: RoamView): Promise<void> {
+    if (!this.followAllowed()) return;
+    try {
+      await vscode.commands.executeCommand(
+        'revealInExplorer',
+        toSourceUri(vscode.Uri.parse(view.id)),
+      );
+      await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+    } catch {
+      return;
     }
   }
 
@@ -234,6 +255,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   status.name = 'Mothlight';
   status.command = 'mothlight.toggle';
   let typeCapture: vscode.Disposable | undefined;
+  let lastArea: 'editor' | 'terminal' = 'editor';
 
   const render = (state: RoamState, detail?: string): void => {
     status.text = ICONS[state];
@@ -251,7 +273,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (detail) output.appendLine(new Date().toISOString() + ' ' + state + ' ' + detail);
   };
 
-  const host = new VscodeHost(docs, render);
+  const host = new VscodeHost(docs, render, () => lastArea === 'editor');
   const roam = new RoamController(host);
   controller = roam;
 
@@ -265,6 +287,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         event.kind === vscode.TextEditorSelectionChangeKind.Keyboard ||
         event.kind === vscode.TextEditorSelectionChangeKind.Mouse
       ) {
+        lastArea = 'editor';
         roam.noteActivity('editor');
       }
     }),
@@ -286,10 +309,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.tabGroups.onDidChangeTabs(() => {
       if (roam.state !== 'roaming') roam.noteActivity('other');
     }),
-    vscode.window.onDidChangeActiveTerminal(() => roam.noteActivity('other')),
-    vscode.window.onDidOpenTerminal(() => roam.noteActivity('other')),
+    vscode.window.onDidChangeActiveTerminal(() => {
+      lastArea = 'terminal';
+      roam.noteActivity('other');
+    }),
+    vscode.window.onDidOpenTerminal(() => {
+      lastArea = 'terminal';
+      roam.noteActivity('other');
+    }),
     vscode.window.onDidCloseTerminal(() => roam.noteActivity('other')),
-    vscode.window.onDidStartTerminalShellExecution(() => roam.noteActivity('other')),
+    vscode.window.onDidStartTerminalShellExecution(() => {
+      lastArea = 'terminal';
+      roam.noteActivity('other');
+    }),
     vscode.window.onDidEndTerminalShellExecution(() => roam.noteActivity('other')),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration(SECTION)) {

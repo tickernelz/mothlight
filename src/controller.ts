@@ -18,6 +18,7 @@ export interface RoamHost {
   candidates(): Promise<readonly string[]>;
   open(key: string): Promise<RoamView | undefined>;
   show(view: RoamView): Promise<boolean>;
+  reveal(view: RoamView): Promise<void>;
   geometry(view: RoamView): Geometry | undefined;
   scrollTo(view: RoamView, line: number): void;
   close(views: readonly RoamView[]): Promise<void>;
@@ -301,6 +302,10 @@ export class RoamController {
       const dropped = this.views.filter((candidate) => candidate !== view).slice(0, excess);
       this.views = this.views.filter((candidate) => !dropped.includes(candidate));
       await this.host.close(dropped);
+      if (session !== this.session) return;
+    }
+    if (settings.followExplorer) {
+      await this.host.reveal(view);
       if (session !== this.session) return;
     }
     const now = this.clock.now();

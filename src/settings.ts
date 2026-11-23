@@ -1,5 +1,6 @@
 export interface RoamSettings {
   enabled: boolean;
+  followExplorer: boolean;
   idleSeconds: number;
   moveMinSeconds: number;
   moveMaxSeconds: number;
@@ -46,6 +47,7 @@ export function normalizeSettings(raw: RawSettings): RoamSettings {
     : DEFAULT_EXCLUDE;
   return {
     enabled: raw.enabled !== false,
+    followExplorer: raw.followExplorer !== false,
     idleSeconds: bounded(raw.idleSeconds, 60, 5, 3600),
     moveMinSeconds: moveMin,
     moveMaxSeconds: Math.max(moveMin, moveMax),
