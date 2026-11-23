@@ -27,15 +27,23 @@ VS Code does not report typing inside the integrated terminal that does not run 
 
 ## Roaming
 
-When the idle period has passed, Mothlight collects candidate files with `workspace.findFiles` (at most 20,000), applies the `mothlight.exclude` globs and its built-in filters, then repeats this loop:
+When the idle period has passed, Mothlight collects candidate files with `workspace.findFiles` (at most 20,000), applies the `mothlight.exclude` globs and its built-in filters, then alternates between a short movement and a long stand-still until you come back:
 
-1. Pick a random file, avoiding the last eight shown. About one hop in three goes back to a roam tab that is already open instead.
+1. Pick a random file, avoiding the last eight shown. About one time in three goes back to a roam tab that is already open instead.
 2. Open it as a read-only copy and scroll to the top.
-3. Scroll down at `mothlight.scrollLinesPerSecond` in 100 ms ticks, accumulating fractional lines.
-4. After a random time between `mothlight.hopMinSeconds` and `mothlight.hopMaxSeconds`, or two seconds after the end of the file, hop to the next file.
-5. Keep at most `mothlight.maxRoamTabs` roam tabs, closing the oldest.
+3. Scroll down at `mothlight.scrollLinesPerSecond` for a random time between `mothlight.moveMinSeconds` and `mothlight.moveMaxSeconds`, or until the end of the file, whichever comes first.
+4. Stand still for a random time between `mothlight.pauseMinSeconds` and `mothlight.pauseMaxSeconds`. The last file stays on screen and nothing moves.
+5. Go back to step 1. At most `mothlight.maxRoamTabs` roam tabs are kept, closing the oldest.
 
 A file that cannot be read, is empty, looks binary or exceeds `mothlight.maxFileSizeKb` is skipped for the rest of the session.
+
+### Resource use
+
+- Watching costs one timer that wakes up at most once per idle period.
+- While moving, Mothlight wakes about six times per second at the default speed, and never more than ten. While standing still it wakes once per second, which is also how quickly a scroll or tab switch of yours is noticed. Typing, clicking and selecting stop it immediately.
+- The file list is built once and reused for ten minutes, or until the workspace folders or the `mothlight` settings change. A scan that is still running when you come back is cancelled.
+- Only one file at a time is read, never above `mothlight.maxFileSizeKb`. At most `mothlight.maxRoamTabs` copies are kept in memory, and all of them are released when roaming stops.
+- No network access, no child processes and no workspace files written.
 
 ### Read-only copies
 
@@ -58,7 +66,7 @@ Any activity signal ends roaming. Mothlight then closes every roam tab, and VS C
 - keyboard, mouse, selection and scroll activity in an editor return focus to the editor
 - window, terminal and tab activity leave focus where it is
 
-Scrolling is detected by reading the top line back on every tick. If it changed and the new line is not near one of the last eight lines Mothlight scrolled to (two lines, or 40% of the scroll speed, of tolerance), you scrolled. An editor that does not report scrolling, for example because its window is hidden, never counts as activity. The same tick notices when you switch to another tab or close the roam tab, within 100 ms. Tab events are deliberately not used while roaming, because they also fire for Mothlight's own tabs.
+Scrolling is detected by reading the top line back on every tick. While moving, a change to a line that is not near one of the last eight lines Mothlight scrolled to (two lines, or 40% of the scroll speed, of tolerance) means you scrolled. While standing still, any change in the top line means you scrolled, after a short settling time. An editor that does not report scrolling, for example because its window is hidden, never counts as activity. The same tick notices when you switch to another tab or close the roam tab, within 100 ms. Tab events are deliberately not used while roaming, because they also fire for Mothlight's own tabs.
 
 ### Typing into a copy
 

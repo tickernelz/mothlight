@@ -108,6 +108,27 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    'nothing changes while standing still',
+    async () => {
+      await openReal('src/beta.ts');
+      await withSettings(
+        { moveMinSeconds: 2, moveMaxSeconds: 2, pauseMinSeconds: 30, pauseMaxSeconds: 30 },
+        async () => {
+          await vscode.commands.executeCommand('mothlight.startNow');
+          await waitFor(() => viewTabs().length === 1, 'a roam tab');
+          await new Promise((resolve) => setTimeout(resolve, 3500));
+          const resting = snapshot();
+          const until = Date.now() + 8000;
+          while (Date.now() < until) {
+            assert.equal(snapshot(), resting, 'tabs changed during the pause');
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          assert.equal(viewTabs().length, 1);
+        },
+      );
+    },
+  ],
+  [
     'typing while browsing hands control back',
     async () => {
       await openReal('src/beta.ts');
@@ -130,7 +151,7 @@ const tests: [string, () => Promise<void>][] = [
     'excluded files are never opened and several files are visited',
     async () => {
       await openReal('src/alpha.ts');
-      await withSettings({ hopMinSeconds: 2, hopMaxSeconds: 2 }, async () => {
+      await withSettings({ moveMinSeconds: 2, moveMaxSeconds: 2, pauseMinSeconds: 1, pauseMaxSeconds: 1 }, async () => {
         await vscode.commands.executeCommand('mothlight.startNow');
         const seen = new Set<string>();
         const timeline: string[] = [];

@@ -6,11 +6,13 @@ All settings live under `mothlight.*` in the VS Code settings.
 | --- | --- | --- | --- |
 | `mothlight.enabled` | `true` | | Browse files when the editor has been idle. |
 | `mothlight.idleSeconds` | `60` | 5 to 3600 | Seconds without activity before roaming starts. |
-| `mothlight.hopMinSeconds` | `8` | 2 to 600 | Shortest time spent on one file. |
-| `mothlight.hopMaxSeconds` | `25` | 2 to 600 | Longest time spent on one file. Never below the minimum. |
+| `mothlight.moveMinSeconds` | `5` | 2 to 120 | Shortest time spent moving before standing still. |
+| `mothlight.moveMaxSeconds` | `12` | 2 to 120 | Longest time spent moving. Never below the minimum. |
+| `mothlight.pauseMinSeconds` | `30` | 1 to 3600 | Shortest time to stand still between movements. |
+| `mothlight.pauseMaxSeconds` | `90` | 1 to 3600 | Longest time to stand still. Never below the minimum. |
 | `mothlight.scrollLinesPerSecond` | `6` | 1 to 60 | Scroll speed in lines per second. |
-| `mothlight.maxRoamTabs` | `4` | 1 to 10 | Most roam tabs kept open at once. |
-| `mothlight.maxFileSizeKb` | `512` | 1 to 20480 | Larger files are never opened. |
+| `mothlight.maxRoamTabs` | `3` | 1 to 10 | Most roam tabs kept open at once. |
+| `mothlight.maxFileSizeKb` | `256` | 1 to 20480 | Larger files are never opened. |
 | `mothlight.exclude` | build and vendor folders | | Glob patterns that are never opened. |
 
 Values outside a range are clamped. Non-numeric values fall back to the default.
