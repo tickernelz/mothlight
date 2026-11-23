@@ -1,7 +1,19 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import * as vscode from 'vscode';
 
 const SCHEME = 'mothlight';
+
+async function screenshot(name: string): Promise<void> {
+  const dir = process.env['MOTHLIGHT_SHOTS'];
+  if (!dir) return;
+  await mkdir(dir, { recursive: true });
+  await new Promise<void>((resolve) => {
+    execFile('import', ['-window', 'root', join(dir, name + '.png')], () => resolve());
+  });
+}
 
 function snapshot(): string {
   const tabs = vscode.window.tabGroups.all.flatMap((group) =>
@@ -56,7 +68,7 @@ async function reset(): Promise<void> {
   await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 }
 
-async function withSettings(values: Record<string, number>, run: () => Promise<void>): Promise<void> {
+async function withSettings(values: Record<string, number | boolean>, run: () => Promise<void>): Promise<void> {
   const config = vscode.workspace.getConfiguration('mothlight');
   for (const [key, value] of Object.entries(values)) {
     await config.update(key, value, vscode.ConfigurationTarget.Global);
@@ -123,6 +135,51 @@ const tests: [string, () => Promise<void>][] = [
             assert.equal(snapshot(), resting, 'tabs changed during the pause');
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
+          assert.equal(viewTabs().length, 1);
+        },
+      );
+    },
+  ],
+  [
+    'the roam tab keeps the editor focus while the explorer follows',
+    async () => {
+      await openReal('docs/notes.md');
+      await withSettings(
+        { moveMinSeconds: 2, moveMaxSeconds: 2, pauseMinSeconds: 30, pauseMaxSeconds: 30 },
+        async () => {
+          await vscode.commands.executeCommand('mothlight.startNow');
+          await waitFor(
+            () => viewTabs().length === 1 && activeUri()?.scheme === SCHEME,
+            'a roam tab',
+          );
+          await new Promise((resolve) => setTimeout(resolve, 2500));
+          await screenshot('follow-on');
+          assert.equal(activeUri()?.scheme, SCHEME, 'the roam tab is still active');
+          assert.equal(viewTabs().length, 1);
+        },
+      );
+    },
+  ],
+  [
+    'turning the follow setting off still browses',
+    async () => {
+      await openReal('docs/notes.md');
+      await withSettings(
+        {
+          followExplorer: false,
+          moveMinSeconds: 2,
+          moveMaxSeconds: 2,
+          pauseMinSeconds: 30,
+          pauseMaxSeconds: 30,
+        },
+        async () => {
+          await vscode.commands.executeCommand('mothlight.startNow');
+          await waitFor(
+            () => viewTabs().length === 1 && activeUri()?.scheme === SCHEME,
+            'a roam tab',
+          );
+          await new Promise((resolve) => setTimeout(resolve, 2500));
+          await screenshot('follow-off');
           assert.equal(viewTabs().length, 1);
         },
       );

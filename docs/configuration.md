@@ -5,6 +5,7 @@ All settings live under `mothlight.*` in the VS Code settings.
 | Setting | Default | Range | Description |
 | --- | --- | --- | --- |
 | `mothlight.enabled` | `true` | | Browse files when the editor has been idle. |
+| `mothlight.followExplorer` | `true` | | Show the file being browsed in the Explorer sidebar. Opens the sidebar when hidden and returns keyboard focus to the editor area. |
 | `mothlight.idleSeconds` | `60` | 5 to 3600 | Seconds without activity before roaming starts. |
 | `mothlight.moveMinSeconds` | `5` | 2 to 120 | Shortest time spent moving before standing still. |
 | `mothlight.moveMaxSeconds` | `12` | 2 to 120 | Longest time spent moving. Never below the minimum. |

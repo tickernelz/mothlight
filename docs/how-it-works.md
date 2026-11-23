@@ -37,6 +37,16 @@ When the idle period has passed, Mothlight collects candidate files with `worksp
 
 A file that cannot be read, is empty, looks binary or exceeds `mothlight.maxFileSizeKb` is skipped for the rest of the session.
 
+### Following in the Explorer
+
+With `mothlight.followExplorer` on, the default, every file that comes into view is also revealed in the Explorer sidebar. Mothlight calls the built-in `revealInExplorer` command with the real file and then moves keyboard focus back to the editor area. The built-in command always focuses the Explorer tree, where Delete and Enter act on files, so the second step keeps a stray keystroke from landing there.
+
+Things to know:
+
+- The Explorer sidebar is opened when it was hidden or showing another view, and it stays that way after roaming stops.
+- Keyboard focus ends in the editor area, on the roam tab. Typing then stops roaming through the `type` command, as usual.
+- Mothlight skips the reveal when the last thing you did was in a terminal: opening one, switching to one or running a command. It cannot see a terminal you only clicked into, so turn the setting off if you work that way.
+
 ### Resource use
 
 - Watching costs one timer that wakes up at most once per idle period.
