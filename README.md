@@ -19,6 +19,7 @@ Mothlight keeps a quiet editor gently moving. After a minute without activity it
 - **Gets out of the way.** Typing, clicking, scrolling, switching tabs or focusing the window ends the drift and restores your editor.
 - **Careful about what it shows.** Environment files, keys and credentials are never opened, and neither are binaries, lock files or very large files.
 - **Follows along.** The Explorer sidebar shows the file being browsed. Turn it off with `mothlight.followExplorer`.
+- **Varied.** Every movement starts at a random place in the file and scrolls up or down at random.
 - **Moves in bursts.** A few seconds of motion, then a long stand-still, repeated. Both lengths are settings.
 - **Light.** One timer while watching, one wake-up per second while standing still, a cached file list and a hard cap on file size. No network access, no telemetry, no child processes.
 

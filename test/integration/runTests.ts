@@ -10,9 +10,9 @@ function source(name: string, lines: number): string {
 async function createWorkspace(): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), 'mothlight-workspace-'));
   const files: Record<string, string | Uint8Array> = {
-    'src/alpha.ts': source('alpha', 160),
-    'src/beta.ts': source('beta', 160),
-    'src/gamma.ts': source('gamma', 160),
+    'src/alpha.ts': source('alpha', 400),
+    'src/beta.ts': source('beta', 400),
+    'src/gamma.ts': source('gamma', 400),
     'docs/notes.md': Array.from({ length: 120 }, (_, index) => 'line ' + index).join('\n') + '\n',
     '.env': 'EXAMPLE=value\n',
     'vendor/lib.js': source('vendor', 80),

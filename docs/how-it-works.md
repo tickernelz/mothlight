@@ -30,8 +30,8 @@ VS Code does not report typing inside the integrated terminal that does not run 
 When the idle period has passed, Mothlight collects candidate files with `workspace.findFiles` (at most 20,000), applies the `mothlight.exclude` globs and its built-in filters, then alternates between a short movement and a long stand-still until you come back:
 
 1. Pick a random file, avoiding the last eight shown. About one time in three goes back to a roam tab that is already open instead.
-2. Open it as a read-only copy and scroll to the top.
-3. Scroll down at `mothlight.scrollLinesPerSecond` for a random time between `mothlight.moveMinSeconds` and `mothlight.moveMaxSeconds`, or until the end of the file, whichever comes first.
+2. Open it as a read-only copy and jump to a random line anywhere in the file: near the top, in the middle or near the bottom.
+3. Scroll from there, up or down at random, at `mothlight.scrollLinesPerSecond` for a random time between `mothlight.moveMinSeconds` and `mothlight.moveMaxSeconds`, or until the top or the bottom of the file, whichever comes first. A file that fits on one screen does not scroll.
 4. Stand still for a random time between `mothlight.pauseMinSeconds` and `mothlight.pauseMaxSeconds`. The last file stays on screen and nothing moves.
 5. Go back to step 1. At most `mothlight.maxRoamTabs` roam tabs are kept, closing the oldest.
 

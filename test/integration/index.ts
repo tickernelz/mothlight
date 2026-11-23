@@ -186,6 +186,25 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    'each movement starts at a different place in the file',
+    async () => {
+      await openReal('src/alpha.ts');
+      await withSettings(
+        { moveMinSeconds: 2, moveMaxSeconds: 2, pauseMinSeconds: 1, pauseMaxSeconds: 1 },
+        async () => {
+          await vscode.commands.executeCommand('mothlight.startNow');
+          let highest = 0;
+          const until = Date.now() + 28000;
+          while (Date.now() < until) {
+            highest = Math.max(highest, roamTop() ?? 0);
+            await new Promise((resolve) => setTimeout(resolve, 200));
+          }
+          assert.ok(highest > 100, 'the highest top line seen was ' + highest);
+        },
+      );
+    },
+  ],
+  [
     'typing while browsing hands control back',
     async () => {
       await openReal('src/beta.ts');
