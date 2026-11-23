@@ -1,0 +1,155 @@
+{
+  "name": "mothlight",
+  "displayName": "Mothlight",
+  "description": "A quiet editor, kept gently moving.",
+  "version": "0.1.0",
+  "publisher": "tickernelz",
+  "license": "MIT",
+  "author": "Zhafron Adani Kautsar",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tickernelz/mothlight.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tickernelz/mothlight/issues"
+  },
+  "homepage": "https://github.com/tickernelz/mothlight#readme",
+  "keywords": [
+    "ambient",
+    "editor",
+    "motion"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "icon": "assets/icon.png",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "mothlight.toggle",
+        "title": "Toggle",
+        "category": "Mothlight"
+      },
+      {
+        "command": "mothlight.startNow",
+        "title": "Start Now",
+        "category": "Mothlight"
+      },
+      {
+        "command": "mothlight.stop",
+        "title": "Stop",
+        "category": "Mothlight"
+      }
+    ],
+    "configuration": {
+      "title": "Mothlight",
+      "properties": {
+        "mothlight.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Roam through workspace files when the editor has been idle."
+        },
+        "mothlight.idleSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "maximum": 3600,
+          "description": "Seconds without editor activity before roaming starts."
+        },
+        "mothlight.hopMinSeconds": {
+          "type": "number",
+          "default": 8,
+          "minimum": 2,
+          "maximum": 600,
+          "description": "Shortest time spent on one file before moving to the next."
+        },
+        "mothlight.hopMaxSeconds": {
+          "type": "number",
+          "default": 25,
+          "minimum": 2,
+          "maximum": 600,
+          "description": "Longest time spent on one file before moving to the next."
+        },
+        "mothlight.scrollLinesPerSecond": {
+          "type": "number",
+          "default": 6,
+          "minimum": 1,
+          "maximum": 60,
+          "description": "Scroll speed while roaming, in lines per second."
+        },
+        "mothlight.maxRoamTabs": {
+          "type": "integer",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Most roaming tabs kept open at once. Older ones are closed."
+        },
+        "mothlight.maxFileSizeKb": {
+          "type": "integer",
+          "default": 512,
+          "minimum": 1,
+          "maximum": 20480,
+          "description": "Files larger than this are never opened."
+        },
+        "mothlight.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/.hg/**",
+            "**/.svn/**",
+            "**/dist/**",
+            "**/out/**",
+            "**/build/**",
+            "**/target/**",
+            "**/vendor/**",
+            "**/.venv/**",
+            "**/venv/**",
+            "**/__pycache__/**",
+            "**/coverage/**",
+            "**/.next/**",
+            "**/.cache/**"
+          ],
+          "description": "Glob patterns of files that are never opened. Environment files, keys and credentials are always skipped."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --sourcemap --outfile=out/extension.js",
+    "build:test": "esbuild test/integration/runTests.ts test/integration/index.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outdir=out/test",
+    "typecheck": "tsc --noEmit -p .",
+    "lint": "eslint .",
+    "test:unit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"test/unit/*.test.ts\"",
+    "test:integration": "npm run build && npm run build:test && node out/test/runTests.js",
+    "package": "npm run build && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/vscode": "^1.93.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.1",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.15.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.73.0"
+  }
+}
