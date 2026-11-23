@@ -33,6 +33,11 @@ function activeUri(): vscode.Uri | undefined {
   return active ? tabUri(active) : undefined;
 }
 
+function roamTop(): number | undefined {
+  const editor = vscode.window.visibleTextEditors.find((candidate) => candidate.document.uri.scheme === SCHEME);
+  return editor?.visibleRanges[0]?.start.line;
+}
+
 async function openReal(relative: string): Promise<vscode.TextDocument> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) throw new Error('the test workspace is not open');
@@ -89,6 +94,22 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    'the copy scrolls while browsing',
+    async () => {
+      await openReal('src/beta.ts');
+      await vscode.commands.executeCommand('mothlight.startNow');
+      const timeline: string[] = [];
+      const until = Date.now() + 4000;
+      while (Date.now() < until) {
+        timeline.push(viewTabs().length + ':' + String(roamTop()));
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      const message = 'timeline tabs:top ' + timeline.join(' ');
+      assert.ok(viewTabs().length >= 1, message);
+      assert.ok((roamTop() ?? 0) > 0, message);
+    },
+  ],
+  [
     'typing while browsing hands control back',
     async () => {
       await openReal('src/beta.ts');
@@ -114,15 +135,19 @@ const tests: [string, () => Promise<void>][] = [
       await withSettings({ hopMinSeconds: 2, hopMaxSeconds: 2 }, async () => {
         await vscode.commands.executeCommand('mothlight.startNow');
         const seen = new Set<string>();
+        const timeline: string[] = [];
         const until = Date.now() + 16000;
+        let tick = 0;
         while (Date.now() < until) {
           for (const tab of viewTabs()) {
             const uri = tabUri(tab);
             if (uri) seen.add(uri.path);
           }
+          if (tick % 4 === 0) timeline.push(viewTabs().length + ':' + String(roamTop()));
+          tick += 1;
           await new Promise((resolve) => setTimeout(resolve, 250));
         }
-        assert.ok(seen.size >= 2, 'visited ' + [...seen].join(', '));
+        assert.ok(seen.size >= 2, 'visited ' + [...seen].join(', ') + ' timeline tabs:top ' + timeline.join(' '));
         for (const path of seen) {
           assert.ok(!path.includes('/vendor/'), path);
           assert.ok(!path.endsWith('.env'), path);
